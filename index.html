@@ -202,25 +202,39 @@
         }
 
         function exportProgress() {
-            const code = btoa(JSON.stringify({ i: currentIndex, t: questions.length }));
-            prompt('📤 复制以下进度码，在其他设备上点击「导入进度」粘贴即可：', code);
+            const label = prompt('📤 给你的进度起个名字（任意字符）：', 'mycode');
+            if (!label) return;
+            const safe = label.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fa5_]/g, '');
+            if (!safe) { alert('⚠️ 名字不能为空。'); return; }
+            const code = safe + '-' + (currentIndex + 1);
+            prompt('✅ 你的进度码（记住它，在其他设备上导入）：', code);
         }
 
         function importProgress() {
-            const code = prompt('📥 请粘贴你的进度码：');
-            if (!code) return;
-            try {
-                const data = JSON.parse(atob(code.trim()));
-                if (typeof data.i === 'number' && data.i >= 0 && data.i < questions.length) {
-                    currentIndex = data.i;
+            const input = prompt('📥 输入你的进度码（如 mycode-87）：');
+            if (!input) return;
+            const trimmed = input.trim();
+            // Parse: anything ending in -<number>
+            const match = trimmed.match(/-(\d+)$/);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (num >= 1 && num <= questions.length) {
+                    currentIndex = num - 1;
                     renderQuestion();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
-                    alert(`✅ 进度已恢复！当前第 ${currentIndex + 1} 题。`);
-                } else {
-                    alert('⚠️ 进度码无效或与当前题库不匹配，请重新导出。');
+                    alert(`✅ 已跳转到第 ${num} 题。`);
+                    return;
                 }
-            } catch (e) {
-                alert('⚠️ 进度码格式错误，请重新复制完整的进度码。');
+            }
+            // Fallback: pure number
+            const num = parseInt(trimmed, 10);
+            if (!isNaN(num) && num >= 1 && num <= questions.length) {
+                currentIndex = num - 1;
+                renderQuestion();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                alert(`✅ 已跳转到第 ${num} 题。`);
+            } else {
+                alert(`⚠️ 无法识别。请输入正确的进度码（如 mycode-87）。`);
             }
         }
 
