@@ -125,17 +125,37 @@
             </div>
         </div>
 
+        <!-- View: Month Selection -->
+        <div id="month-selection-view" class="hidden flex-grow flex flex-col items-center justify-center space-y-12 py-12">
+            <div class="text-center space-y-4">
+                <button onclick="goBackToGroups()" class="text-slate-500 hover:text-white transition-colors flex items-center gap-2 mx-auto">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7 7-7"></path></svg>
+                    Change Group
+                </button>
+                <h1 id="month-title" class="text-4xl md:text-5xl font-bold text-white">Select Month</h1>
+                <p class="text-slate-400">Filter recalls by time or practice everything</p>
+            </div>
+
+            <div id="month-grid" class="flex flex-wrap justify-center gap-4 max-w-3xl">
+                <!-- Month pills placeholder -->
+            </div>
+            
+            <button onclick="selectMonth('all')" class="glass-panel px-10 py-4 rounded-full text-blue-400 border-blue-400/30 hover:bg-blue-400/10 transition-all font-semibold uppercase tracking-widest text-sm">
+                Practice All Decades
+            </button>
+        </div>
+
         <!-- View: Study Environment -->
         <div id="study-view" class="hidden flex-grow flex flex-col">
             <!-- Header -->
             <div class="flex items-center justify-between mb-8">
-                <button onclick="goHome()" class="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                <button onclick="goBackToMonths()" class="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7 7-7"></path></svg>
-                    Back to Sources
+                    Back
                 </button>
                 <div class="text-right">
                     <div id="group-title-display" class="font-bold text-lg text-slate-200">Group Name</div>
-                    <div class="text-xs text-slate-500 font-mono tracking-widest uppercase">Recall System v2.0</div>
+                    <div id="month-title-display" class="text-[10px] text-blue-400 font-mono tracking-widest uppercase bg-blue-400/10 px-2 py-0.5 rounded ml-auto w-fit">All Time</div>
                 </div>
             </div>
 
@@ -238,41 +258,93 @@
 
         function selectGroup(groupName) {
             state.currentGroup = groupName;
-            state.filteredQuestions = questionsData.filter(q => q.source_group === groupName);
+            state.allFilteredByGroup = questionsData.filter(q => q.source_group === groupName);
             
-            if (state.filteredQuestions.length === 0) {
-                // Fallback for untagged if needed, or error
-                if (groupName === 'Other') {
-                    state.filteredQuestions = questionsData.filter(q => !q.source_group || (q.source_group !== 'AMC Part 1 general discussion by Dr Jayse' && q.source_group !== 'Dr. Aaru’s AMC General Group'));
-                } else {
-                    alert("No questions found for this group.");
-                    return;
-                }
+            if (state.allFilteredByGroup.length === 0) {
+                alert("No questions found for this group.");
+                return;
             }
 
-            // Restore progress
-            const savedIndex = localStorage.getItem(`amc_progress_${groupName}`);
+            renderMonthSelection();
+        }
+
+        function renderMonthSelection() {
+            document.getElementById('group-selection-view').classList.add('hidden');
+            document.getElementById('month-selection-view').classList.remove('hidden');
+            document.getElementById('month-title').innerText = state.currentGroup === 'AMC Part 1 general discussion by Dr Jayse' ? 'Dr Jayse Recalls' : 'Dr. Aaru Recalls';
+            
+            const monthGrid = document.getElementById('month-grid');
+            monthGrid.innerHTML = '';
+
+            // Group by month
+            const monthMap = {};
+            state.allFilteredByGroup.forEach(q => {
+                if (!q.date) return;
+                const date = new Date(q.date);
+                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                const label = date.toLocaleDateString('en-AU', { year: 'numeric', month: 'long' });
+                if (!monthMap[key]) monthMap[key] = { label, count: 0 };
+                monthMap[key].count++;
+            });
+
+            // Sort months descending
+            const sortedKeys = Object.keys(monthMap).sort().reverse();
+            
+            sortedKeys.forEach(key => {
+                const btn = document.createElement('div');
+                btn.className = 'glass-panel px-6 py-4 rounded-2xl cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all flex flex-col items-center gap-1 min-w-[140px]';
+                btn.onclick = () => selectMonth(key, monthMap[key].label);
+                btn.innerHTML = `
+                    <span class="text-white font-medium">${monthMap[key].label}</span>
+                    <span class="text-[10px] text-slate-500 font-mono">${monthMap[key].count} RECALLS</span>
+                `;
+                monthGrid.appendChild(btn);
+            });
+        }
+
+        function selectMonth(monthKey, monthLabel) {
+            if (monthKey === 'all') {
+                state.filteredQuestions = state.allFilteredByGroup;
+                state.currentMonthLabel = 'All Recalls';
+                state.currentMonthKey = 'all';
+            } else {
+                state.filteredQuestions = state.allFilteredByGroup.filter(q => {
+                    if (!q.date) return false;
+                    const d = new Date(q.date);
+                    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    return k === monthKey;
+                });
+                state.currentMonthLabel = monthLabel;
+                state.currentMonthKey = monthKey;
+            }
+
+            // Restore progress for this specific group+month combination
+            const progKey = `amc_progress_${state.currentGroup}_${state.currentMonthKey}`;
+            const savedIndex = localStorage.getItem(progKey);
             state.currentIndex = savedIndex ? parseInt(savedIndex) : 0;
             if (state.currentIndex >= state.filteredQuestions.length) state.currentIndex = 0;
 
-            localStorage.setItem('amc_last_group', groupName);
-            
             showStudyView();
             renderQuestion();
         }
 
-        function goHome() {
+        function goBackToGroups() {
+            document.getElementById('month-selection-view').classList.add('hidden');
             document.getElementById('group-selection-view').classList.remove('hidden');
+        }
+
+        function goBackToMonths() {
             document.getElementById('study-view').classList.add('hidden');
             document.getElementById('nav-dock').classList.add('hidden');
-            state.currentGroup = null;
+            document.getElementById('month-selection-view').classList.remove('hidden');
         }
 
         function showStudyView() {
-            document.getElementById('group-selection-view').classList.add('hidden');
+            document.getElementById('month-selection-view').classList.add('hidden');
             document.getElementById('study-view').classList.remove('hidden');
             document.getElementById('nav-dock').classList.remove('hidden');
-            document.getElementById('group-title-display').innerText = state.currentGroup === 'AMC Part 1 general discussion by Dr Jayse' ? 'Dr Jayse Recalls' : 'Dr. Aaru Recalls';
+            document.getElementById('group-title-display').innerText = state.currentGroup === 'AMC Part 1 general discussion by Dr Jayse' ? 'Dr Jayse' : 'Dr. Aaru';
+            document.getElementById('month-title-display').innerText = state.currentMonthLabel;
         }
 
         function renderQuestion() {
@@ -323,8 +395,9 @@
             // Update Progress
             updateProgressUI();
             
-            // Auto-save index
-            localStorage.setItem(`amc_progress_${state.currentGroup}`, state.currentIndex);
+            // Auto-save index for this group + month
+            const progKey = `amc_progress_${state.currentGroup}_${state.currentMonthKey}`;
+            localStorage.setItem(progKey, state.currentIndex);
             
             // Scroll to top
             window.scrollTo({ top: 0, behavior: 'smooth' });
