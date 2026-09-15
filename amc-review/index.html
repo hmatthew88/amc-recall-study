@@ -186,6 +186,9 @@ let dueAnswers = {};
 
 const LS_PREFIX = "amc-review-platform-";
 const IS_GITHUB_PAGES = location.hostname.endsWith("github.io");
+const SYNC_API = IS_GITHUB_PAGES
+  ? "https://amc-review.netlify.app/.netlify/functions/progress"
+  : "/.netlify/functions/progress";
 const $ = id => document.getElementById(id);
 
 async function init() {
@@ -213,11 +216,8 @@ async function init() {
     localStorage.setItem(SYNC_CODE_KEY, syncCode);
     schedulePull();
   });
-  if (IS_GITHUB_PAGES) {
-    document.querySelector(".sync-row").style.display = "none";
-  }
   render();
-  if (!IS_GITHUB_PAGES && syncCode) schedulePull();
+  if (syncCode) schedulePull();
 }
 
 function dates() {
@@ -310,11 +310,11 @@ function syncStatus(text) {
   if (el) el.textContent = text;
 }
 function schedulePush() {
-  if (IS_GITHUB_PAGES || !syncCode) return;
+  if (!syncCode) return;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
     try {
-      const res = await fetch("/.netlify/functions/progress", {
+      const res = await fetch(SYNC_API, {
         method: "PUT",
         headers: {"content-type": "application/json"},
         body: JSON.stringify({code: syncCode, data: scheduleMap()})
@@ -327,10 +327,10 @@ function schedulePush() {
   }, 600);
 }
 async function schedulePull() {
-  if (IS_GITHUB_PAGES || !syncCode) return;
+  if (!syncCode) return;
   syncStatus("同步中...");
   try {
-    const res = await fetch("/.netlify/functions/progress?code=" + encodeURIComponent(syncCode), {cache: "no-store"});
+    const res = await fetch(SYNC_API + "?code=" + encodeURIComponent(syncCode), {cache: "no-store"});
     if (!res.ok) throw new Error("HTTP " + res.status);
     const remote = await res.json();
     const local = scheduleMap();
