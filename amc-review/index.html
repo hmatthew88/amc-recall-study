@@ -185,10 +185,7 @@ let view = "daily";
 let dueAnswers = {};
 
 const LS_PREFIX = "amc-review-platform-";
-const IS_GITHUB_PAGES = location.hostname.endsWith("github.io");
-const SYNC_API = IS_GITHUB_PAGES
-  ? "https://amc-review.netlify.app/.netlify/functions/progress"
-  : "/.netlify/functions/progress";
+const SYNC_API = "https://amc-review-sync.matthewwang-amc.workers.dev";
 const $ = id => document.getElementById(id);
 
 async function init() {
